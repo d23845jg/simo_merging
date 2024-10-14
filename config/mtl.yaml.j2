@@ -1,0 +1,46 @@
+wandb:
+  project: "simomm"
+  mode: "online"
+  
+dataset_paths:
+  nyuv2: "/mnt/lts4/scratch/data/nyuv2"
+  cityscapes: "/mnt/lts4/scratch/data/cityscapes"
+
+training_params:
+  # Model parameters
+  task: "depth" # all, seg, depth, normal
+  dataset: "nyuv2" # nyuv2, cityscapes
+  network: "dinov2" # split, mtan, dinov2
+  weight: "equal" # equal, dwa, uncert
+  grad_method: "none" # graddrop, pcgrad, cagrad
+  with_noise: false # with noise prediction task
+
+  # Training parameters
+  total_epochs: 10
+  lr_head: 0.0001
+  batch_size: 16
+  gpu: 1 # gpu ID
+  out_dir: "checkpoints/dinov2/linear_head/hyperparam_tuning"
+  seed: 612
+
+model_merging:
+  method: "sum"
+  pt_model_file: "checkpoints/mtl_model.pt"
+  ft_model_files:
+    - "checkpoints/dinov2/linear_probing/seg_model.pt"
+    - "checkpoints/dinov2/linear_probing/depth_model.pt"
+  dataset: "nyuv2" # nyuv2, cityscapes
+  network: "split" # split, mtan
+  
+  num_scaling_coef_samples: 5
+  specify_lambda: None
+
+
+# Include other YAML configurations
+{% include "config/model_merging/average.yaml.j2" %}
+{% include "config/model_merging/consensus.yaml.j2" %}
+{% include "config/model_merging/mag_masking.yaml.j2" %}
+{% include "config/model_merging/sum.yaml.j2" %}
+{% include "config/model_merging/tall_mask.yaml.j2" %}
+{% include "config/model_merging/ties.yaml.j2" %}
+{% include "config/model_merging/zeroshot.yaml.j2" %}
