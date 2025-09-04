@@ -6,10 +6,6 @@
 import torch
 import torch.nn as nn
 
-<<<<<<< Updated upstream
-from .decode_heads import BNHead
-=======
->>>>>>> Stashed changes
 from ...losses import L1Loss
 from .decode_heads import BNHead, DPTHead
 
@@ -19,6 +15,8 @@ def _make_dinov2_linear_normal_head(
     embed_dim: int,
     cls_token: bool,
     layers: int,
+    num_classes: int,
+    loss_name="loss_normal",
     **kwargs,
 ):
     if layers not in (1, 4):
@@ -32,17 +30,13 @@ def _make_dinov2_linear_normal_head(
 
     return BNHead(
         in_channels=[embed_dim] * len(in_index),
+        out_channels=num_classes,
         in_index=in_index,
         input_transform="resize_concat",
         channels=embed_dim * len(in_index) * (2 if cls_token else 1),
         use_cls_token=cls_token,
         dropout_ratio=0,
         align_corners=False,
-<<<<<<< Updated upstream
-        loss_decode=nn.ModuleList([
-            L1Loss(),
-        ]),
-=======
         loss_decode=nn.ModuleList(
             [
                 L1Loss(loss_name=loss_name),
@@ -162,6 +156,5 @@ def _make_dinov2_dpt_add_small_normal_head(
                 L1Loss(loss_name=loss_name),
             ]
         ),
->>>>>>> Stashed changes
         ignore_index=0,
     )

@@ -4,26 +4,12 @@ import warnings
 import torch
 import torch.nn as nn
 
-from ..ops import resize
+from ...layers.dpt import ConvModule, FeatureFusionBlock, HeadSeg, ReassembleBlocks
+from ...layers.ops import resize
 
 
 class NormalBaseDecodeHead(nn.Module):
     def __init__(
-<<<<<<< Updated upstream
-      self,
-      in_channels,
-      channels,
-      *,
-      dropout_ratio=0.1,
-      conv_layer=None,
-      act_layer=nn.ReLU,
-      in_index=-1,
-      input_transform=None,
-      loss_decode=(),
-      ignore_index=255,
-      sampler=None,
-      align_corners=False,
-=======
         self,
         *,
         in_channels,
@@ -39,93 +25,28 @@ class NormalBaseDecodeHead(nn.Module):
         sampler=None,
         align_corners=False,
         norm_layer=None,
->>>>>>> Stashed changes
     ):
         super().__init__()
-        self._init_inputs(in_channels, in_index, input_transform)
+        self.in_channels = in_channels
         self.channels = channels
         self.dropout_ratio = dropout_ratio
         self.conv_layer = conv_layer
         self.act_layer = act_layer
-        self.in_index = in_index
         self.loss_decode = loss_decode
         self.ignore_index = ignore_index
         self.align_corners = align_corners
+        self.norm_layer = norm_layer
+        self.out_channels = out_channels
 
-        self.conv_norm = nn.Conv2d(channels, 3, kernel_size=1)
+        self.conv_normal = nn.Conv2d(channels, self.out_channels, kernel_size=1)
         if dropout_ratio > 0:
             self.dropout = nn.Dropout2d(dropout_ratio)
         else:
             self.dropout = None
 
-    def extra_repr(self):
-        """Extra repr."""
-        s = f'input_transform={self.input_transform}, ' \
-            f'ignore_index={self.ignore_index}, ' \
-            f'align_corners={self.align_corners}'
-        return s
-
-    def _init_inputs(self, in_channels, in_index, input_transform):
-        """Check and initialize input transforms.
-
-        The in_channels, in_index and input_transform must match.
-        Specifically, when input_transform is None, only single feature map
-        will be selected. So in_channels and in_index must be of type int.
-        When input_transform
-
-        Args:
-            in_channels (int|Sequence[int]): Input channels.
-            in_index (int|Sequence[int]): Input feature index.
-            input_transform (str|None): Transformation type of input features.
-                Options: 'resize_concat', 'multiple_select', None.
-                'resize_concat': Multiple feature maps will be resize to the
-                    same size as first one and than concat together.
-                    Usually used in FCN head of HRNet.
-                'multiple_select': Multiple feature maps will be bundle into
-                    a list and passed into decode head.
-                None: Only one select feature map is allowed.
-        """
-
-        if input_transform is not None:
-            assert input_transform in ['resize_concat', 'multiple_select']
-        self.input_transform = input_transform
-        self.in_index = in_index
-        if input_transform is not None:
-            assert isinstance(in_channels, (list, tuple))
-            assert isinstance(in_index, (list, tuple))
-            assert len(in_channels) == len(in_index)
-            if input_transform == 'resize_concat':
-                self.in_channels = sum(in_channels)
-            else:
-                self.in_channels = in_channels
-        else:
-            assert isinstance(in_channels, int)
-            assert isinstance(in_index, int)
-            self.in_channels = in_channels
-
     def forward(self, inputs, img_metas):
         """Placeholder of forward function."""
         pass
-<<<<<<< Updated upstream
-      
-    def forward_train(self, img, inputs, img_metas, normal_gt):
-      """Forward function for training.
-      Args:
-          inputs (list[Tensor]): List of multi-level img features.
-          img_metas (list[dict]): List of image info dict where each dict
-              has: 'img_shape', 'scale_factor', 'flip', and may also contain
-              'filename', 'ori_shape', 'pad_shape', and 'img_norm_cfg'.
-              For details on the values of these keys see
-              `depth/datasets/pipelines/formatting.py:Collect`.
-          depth_gt (Tensor): GT depth
-
-      Returns:
-          dict[str, Tensor]: a dictionary of loss components
-      """
-      seg_pred = self.forward(inputs, img_metas)
-      losses = self.loss_by_feat(seg_pred, normal_gt)
-      return losses
-=======
 
     def forward_train(self, img, inputs, img_metas, img_gt, **kwargs):
         """Forward function for training.
@@ -144,13 +65,12 @@ class NormalBaseDecodeHead(nn.Module):
         img_pred = self.forward(inputs, img_metas)
         losses = self.loss_by_feat(img_pred, img_metas, img_gt)
         return losses
->>>>>>> Stashed changes
 
     def normal_pred(self, feat):
         """Classify each pixel."""
         if self.dropout is not None:
             feat = self.dropout(feat)
-        output = self.conv_norm(feat)
+        output = self.conv_normal(feat)
         return output
 
     def predict(self, inputs, batch_img_metas, test_cfg):
@@ -168,15 +88,14 @@ class NormalBaseDecodeHead(nn.Module):
         Returns:
             Tensor: Outputs segmentation logits map.
         """
-        normal_logits = self.forward(inputs)
+        img_pred = self.forward(inputs)
+        return self.predict_by_feat(img_pred, batch_img_metas)
 
-        return self.predict_by_feat(normal_logits, batch_img_metas)
-
-    def loss_by_feat(self, normal_logits, normal_gt):
+    def loss_by_feat(self, img_logits, img_metas, img_gt):
         """Compute segmentation loss.
 
         Args:
-            normal_logits (Tensor): The output from decode head forward function.
+            img_logits (Tensor): The output from decode head forward function.
             batch_data_samples (List[:obj:`SegDataSample`]): The seg
                 data samples. It usually includes information such
                 as `metainfo` and `gt_sem_seg`.
@@ -184,44 +103,19 @@ class NormalBaseDecodeHead(nn.Module):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        normal_label = normal_gt
         loss = dict()
-<<<<<<< Updated upstream
-        normal_logits = resize(
-          input=normal_logits, size=normal_label.shape[2:], mode='bilinear', align_corners=self.align_corners, warning=False
-=======
         img_logits = resize(
             input=img_logits,
             size=img_gt.shape[2:],
             mode="bilinear",
             align_corners=self.align_corners,
             warning=False,
->>>>>>> Stashed changes
         )
-        loss.update({"pred": normal_logits})
-        
-        normal_label = normal_label.squeeze(1)
+        loss.update({"pred": img_logits})
 
         if not isinstance(self.loss_decode, nn.ModuleList):
             losses_decode = [self.loss_decode]
         else:
-<<<<<<< Updated upstream
-          losses_decode = self.loss_decode
-        for loss_decode in losses_decode:
-          if loss_decode.loss_name not in loss:
-            loss[loss_decode.loss_name] = loss_decode(
-              normal_logits,
-              normal_label,
-              ignore_index=self.ignore_index
-            )
-          else:
-            loss[loss_decode.loss_name] += loss_decode(
-              normal_logits,
-              normal_label,
-              ignore_index=self.ignore_index
-            )
-
-=======
             losses_decode = self.loss_decode
 
         ignore_idx = img_metas.get("mask", self.ignore_index)
@@ -234,7 +128,6 @@ class NormalBaseDecodeHead(nn.Module):
                 loss[loss_decode.loss_name] += loss_decode(
                     img_logits, img_gt, ignore_index=ignore_idx
                 )
->>>>>>> Stashed changes
         return loss
 
     def predict_by_feat(self, normal_logits, batch_img_metas):
@@ -269,9 +162,6 @@ class NormalBaseDecodeHead(nn.Module):
 class BNHead(NormalBaseDecodeHead):
     """Just a batchnorm."""
 
-<<<<<<< Updated upstream
-    def __init__(self, resize_factors=None, use_cls_token=True, **kwargs):
-=======
     def __init__(
         self,
         input_transform="resize_concat",
@@ -280,16 +170,13 @@ class BNHead(NormalBaseDecodeHead):
         use_cls_token=True,
         **kwargs,
     ):
->>>>>>> Stashed changes
         super().__init__(**kwargs)
+        self.input_transform = input_transform
+        self.in_index = in_index
         self.use_cls_token = use_cls_token
-<<<<<<< Updated upstream
-        _channels = self.in_channels * 2 if self.use_cls_token else self.in_channels
-=======
         _channels = (
             sum(self.in_channels) * 2 if self.use_cls_token else sum(self.in_channels)
         )
->>>>>>> Stashed changes
         assert _channels == self.channels
         self.bn = nn.SyncBatchNorm(_channels)
         self.resize_factors = resize_factors
@@ -377,12 +264,6 @@ class BNHead(NormalBaseDecodeHead):
         return inputs
 
     def forward(self, inputs, img_metas=None, **kwargs):
-<<<<<<< Updated upstream
-      """Forward function."""
-      output = self._forward_feature(inputs, img_metas=img_metas, **kwargs)
-      output = self.normal_pred(output)
-      return output
-=======
         """Forward function."""
         output = self._forward_feature(inputs, img_metas=img_metas, **kwargs)
         output = self.normal_pred(output)
@@ -473,4 +354,3 @@ class DPTHead(NormalBaseDecodeHead):
         out = self.project(out)
         out = self.normal_pred(out)
         return out
->>>>>>> Stashed changes

@@ -1,14 +1,9 @@
 import copy
-<<<<<<< Updated upstream
-import torch
-from collections import OrderedDict
-=======
 from collections import OrderedDict
 
 import numpy as np
 import torch
 import torch.nn.functional as F
->>>>>>> Stashed changes
 
 
 def state_dict_to_vector(state_dict, remove_keys=[]):
@@ -83,9 +78,6 @@ def topk_values_mask(M, K=0.7, return_mask=False, reshape_mask=False):
     if return_mask:
         return M * final_mask, final_mask.float().mean(dim=1), final_mask
     else:
-<<<<<<< Updated upstream
-        return M * final_mask, final_mask.float().mean(dim=1)
-=======
         return M * final_mask, final_mask.float().mean(dim=1)
 
 
@@ -106,4 +98,3 @@ def compute_cosine_similarity_matrix(task_vectors):
             cosine_sim_matrix[j, i] = cos_sim
 
     return cosine_sim_matrix
->>>>>>> Stashed changes

@@ -1,45 +1,30 @@
 wandb:
   project: "simomm"
-<<<<<<< Updated upstream
-  mode: "online"
-  
-=======
   mode: "online" # online, offline
 
->>>>>>> Stashed changes
 dataset_paths:
   nyuv2: "/mnt/lts4/scratch/data/nyuv2"
   cityscapes: "/mnt/lts4/scratch/data/cityscapes"
+  taskonomy: "/mnt/lts4/scratch/data/taskonomy"
 
 training_params:
   # Model parameters
-  task: "depth" # all, seg, depth, normal
-  dataset: "nyuv2" # nyuv2, cityscapes
-  network: "dinov2" # split, mtan, dinov2
-  weight: "equal" # equal, dwa, uncert
-  grad_method: "none" # graddrop, pcgrad, cagrad
-  with_noise: false # with noise prediction task
+  task: "all" # all, seg, part_seg, depth, disp, normal, segment_semantic, normal, keypoints2d, edge_texture, depth_zbuffer
+  dataset: "nyuv2" # nyuv2, cityscapes, taskonomy
+  network: "dinov2" # dinov2
+  weight: "equal" # equal, uncert
+  grad_method: "none" # none, graddrop, pcgrad, cagrad
 
   # Training parameters
-  total_epochs: 10
-  lr_head: 0.0001
-  batch_size: 16
+  total_epochs: 300
+  batch_size: 32
   gpu: 1 # gpu ID
-  out_dir: "checkpoints/dinov2/linear_head/hyperparam_tuning"
+  out_dir: "checkpoints/cityscapes/dinov2/dpt-add_small/mtl/hyperparam_tuning/lr"
   seed: 612
 
 model_merging:
   method: "sum"
-  pt_model_file: "checkpoints/mtl_model.pt"
   ft_model_files:
-<<<<<<< Updated upstream
-    - "checkpoints/dinov2/linear_probing/seg_model.pt"
-    - "checkpoints/dinov2/linear_probing/depth_model.pt"
-  dataset: "nyuv2" # nyuv2, cityscapes
-  network: "split" # split, mtan
-  
-  num_scaling_coef_samples: 5
-=======
     - "checkpoints/nyuv2/dinov2/linear_head/task_specific/h_hb/final/seg_model.pt"
     - "checkpoints/nyuv2/dinov2/linear_head/task_specific/h_hb/final/depth_model.pt"
     - "checkpoints/nyuv2/dinov2/linear_head/task_specific/h_hb/final/normal_model.pt"
@@ -48,15 +33,13 @@ model_merging:
   out_dir: "tall_mask/dinov2/h_hb"
 
   num_scaling_coef_samples: 11
->>>>>>> Stashed changes
   specify_lambda: None
 
 
 # Include other YAML configurations
 {% include "config/model_merging/average.yaml.j2" %}
-{% include "config/model_merging/consensus.yaml.j2" %}
-{% include "config/model_merging/mag_masking.yaml.j2" %}
 {% include "config/model_merging/sum.yaml.j2" %}
 {% include "config/model_merging/tall_mask.yaml.j2" %}
+{% include "config/model_merging/consensus.yaml.j2" %}
 {% include "config/model_merging/ties.yaml.j2" %}
 {% include "config/model_merging/zeroshot.yaml.j2" %}

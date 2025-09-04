@@ -1,9 +1,4 @@
-<<<<<<< Updated upstream
-import torch
-
-=======
 from copy import deepcopy
->>>>>>> Stashed changes
 from typing import Union
 
 import torch
@@ -51,6 +46,7 @@ class _TaskVector:
                     continue
                 if pretrained_state_dict[key].dtype == torch.uint8:
                     continue
+                # self.theta[key] = finetuned_state_dict[key].double() - pretrained_state_dict[key].double()
                 self.theta[key] = finetuned_state_dict[key] - pretrained_state_dict[key]
 
     def __add__(self, other):
@@ -62,7 +58,9 @@ class _TaskVector:
                     print(f"Warning, key {key} is not present in both task vectors.")
                     continue
                 new_vector[key] = self.theta[key] + other.theta[key]
-        return self.__class__(vector=new_vector)
+        new_tv = deepcopy(self)
+        new_tv.theta = new_vector
+        return new_tv
 
     def __sub__(self, other):
         """Subtract two task vectors."""
@@ -79,7 +77,9 @@ class _TaskVector:
             new_vector = {}
             for key in self.theta:
                 new_vector[key] = -self.theta[key]
-        return self.__class__(vector=new_vector)
+        new_tv = deepcopy(self)
+        new_tv.theta = new_vector
+        return new_tv
 
     def __pow__(self, power):
         """Power of a task vector."""
@@ -87,7 +87,9 @@ class _TaskVector:
             new_vector = {}
             for key in self.theta:
                 new_vector[key] = self.theta[key] ** power
-        return self.__class__(vector=new_vector)
+        new_tv = deepcopy(self)
+        new_tv.theta = new_vector
+        return new_tv
 
     def __mul__(self, other):
         """Multiply a task vector by a scalar."""
@@ -95,7 +97,9 @@ class _TaskVector:
             new_vector = {}
             for key in self.theta:
                 new_vector[key] = other * self.theta[key]
-        return self.__class__(vector=new_vector)
+        new_tv = deepcopy(self)
+        new_tv.theta = new_vector
+        return new_tv
 
     def dot(self, other):
         """Dot product of two task vectors."""
@@ -123,7 +127,8 @@ class MTLTaskVector(_TaskVector):
     ):
         if theta is not None and tau is not None:
             super().__init__(None, None, theta)
-            self.tau = tau
+            if tau is not None:
+                self.tau = tau
         else:
             assert (
                 pretrained_checkpoint is not None and finetuned_checkpoint is not None
@@ -158,7 +163,7 @@ class MTLTaskVector(_TaskVector):
         elif isinstance(checkpoint, nn.Module):
             # Create a new model with the same architecture
             model_class_name = checkpoint.__class__.__name__
-            new_model = globals()[model_class_name](head_tasks=checkpoint.head_tasks)
+            new_model = globals()[model_class_name](**checkpoint.constructor_args)
             new_model.load_state_dict(checkpoint.state_dict())
             return new_model
         else:
@@ -169,17 +174,6 @@ class MTLTaskVector(_TaskVector):
         with torch.no_grad():
             pt_model = self._safe_load(pretrained_checkpoint)
             pt_model_state_dict = pt_model.state_dict()
-<<<<<<< Updated upstream
-            # updates = {}
-            
-            for param_name, param_value in self.theta.items():
-                pt_model_state_dict[param_name].add_(scaling_coef * param_value)
-                # updates[param_name]  = pt_model_state_dict[param_name] + scaling_coef * param_value
-            
-            # pt_model.load_state_dict({**pt_model.state_dict(), **updates, **self.tau})
-            pt_model.load_state_dict({**pt_model.state_dict(), **self.tau}, strict=False)
-        
-=======
             new_state_dict = {}
 
             for param_name, param_value in self.theta.items():
@@ -190,5 +184,4 @@ class MTLTaskVector(_TaskVector):
             pt_model.load_state_dict(new_state_dict, strict=False)
             pt_model.load_state_dict(self.tau, strict=False)
 
->>>>>>> Stashed changes
         return pt_model

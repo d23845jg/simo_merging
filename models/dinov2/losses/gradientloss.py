@@ -61,7 +61,7 @@ class GradientLoss(nn.Module):
 
         return gradient_loss
 
-    def forward(self, depth_pred, depth_gt):
+    def forward(self, depth_pred, depth_gt, **kwargs):
         """Forward function."""
 
         gradient_loss = self.loss_weight * self.gradientloss(depth_pred, depth_gt)

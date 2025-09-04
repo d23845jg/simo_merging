@@ -48,16 +48,6 @@ def get_data_loaders(config, model_merging=False):
     dataset_path = config["dataset_paths"][dataset_name]
 
     # Initialize datasets based on the selected dataset
-<<<<<<< Updated upstream
-    if dataset_name == 'nyuv2':
-        train_set = NYUv2(root=dataset_path, train=True, augmentation=True)
-        test_set = NYUv2(root=dataset_path, train=False)
-    
-    elif dataset_name == 'cityscapes':
-        train_set = CityScapes(root=dataset_path, train=True, augmentation=True)
-        test_set = CityScapes(root=dataset_path, train=False)
-    
-=======
     if dataset_name == "nyuv2":
         train_set = NYUv2(root=dataset_path, mode="train", augmentation=True)
         val_set = NYUv2(root=dataset_path, mode="val")
@@ -108,6 +98,7 @@ def get_data_loaders(config, model_merging=False):
                 "stockman",
             ],
             model_limit=2_000,
+            # model_limit=200,
             label_set=[
                 "depth_zbuffer",
                 "normal",
@@ -122,6 +113,7 @@ def get_data_loaders(config, model_merging=False):
             root=dataset_path,
             model_whitelist=["beechwood", "corozal", "klickitat", "shelbyville"],
             model_limit=1_000,
+            # model_limit=10,
             label_set=[
                 "depth_zbuffer",
                 "normal",
@@ -136,6 +128,7 @@ def get_data_loaders(config, model_merging=False):
             root=dataset_path,
             model_whitelist=["ihlen", "mcdade", "onaga", "tolstoy"],
             model_limit=1_000,
+            # model_limit=10,
             label_set=[
                 "depth_zbuffer",
                 "normal",
@@ -147,7 +140,6 @@ def get_data_loaders(config, model_merging=False):
             augment=False,
         )
 
->>>>>>> Stashed changes
     else:
         raise ValueError(f"Dataset {dataset_name} not supported for data loading")
 
@@ -156,9 +148,6 @@ def get_data_loaders(config, model_merging=False):
         dataset=train_set,
         batch_size=config["training_params"]["batch_size"],
         shuffle=True,
-<<<<<<< Updated upstream
-        num_workers=4
-=======
         num_workers=4,
         pin_memory=True,
         sampler=None,
@@ -170,20 +159,14 @@ def get_data_loaders(config, model_merging=False):
         num_workers=4,
         pin_memory=True,
         sampler=None,
->>>>>>> Stashed changes
     )
-    val_loader = None
     test_loader = torch.utils.data.DataLoader(
         dataset=test_set,
         batch_size=config["training_params"]["batch_size"],
         shuffle=False,
-<<<<<<< Updated upstream
-        num_workers=4
-=======
         num_workers=4,
         pin_memory=True,
         sampler=None,
->>>>>>> Stashed changes
     )
 
     return train_loader, val_loader, test_loader

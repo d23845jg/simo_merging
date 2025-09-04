@@ -4,30 +4,12 @@ import warnings
 import torch
 import torch.nn as nn
 
-from ..ops import resize
-from ...losses import accuracy
+from ...layers.dpt import ConvModule, FeatureFusionBlock, HeadSeg, ReassembleBlocks
+from ...layers.ops import resize
 
 
 class SegBaseDecodeHead(nn.Module):
     def __init__(
-<<<<<<< Updated upstream
-      self,
-      *,
-      in_channels,
-      channels,
-      num_classes,
-      out_channels=None,
-      threshold=None,
-      dropout_ratio=0.1,
-      conv_layer=None,
-      act_layer=nn.ReLU,
-      in_index=-1,
-      input_transform=None,
-      loss_decode=(),
-      ignore_index=255,
-      sampler=None,
-      align_corners=False,
-=======
         self,
         *,
         in_channels,
@@ -44,22 +26,17 @@ class SegBaseDecodeHead(nn.Module):
         sampler=None,
         align_corners=False,
         norm_layer=None,
->>>>>>> Stashed changes
     ):
         super().__init__()
-        self._init_inputs(in_channels, in_index, input_transform)
-        # self.in_channels = in_channels
-        # self.input_transform = input_transform
-        # self.in_index = in_index
-        
+        self.in_channels = in_channels
         self.channels = channels
         self.dropout_ratio = dropout_ratio
         self.conv_layer = conv_layer
         self.act_layer = act_layer
-        self.in_index = in_index
         self.loss_decode = loss_decode
         self.ignore_index = ignore_index
         self.align_corners = align_corners
+        self.norm_layer = norm_layer
 
         if out_channels is None:
             if num_classes == 2:
@@ -82,12 +59,7 @@ class SegBaseDecodeHead(nn.Module):
 
         if out_channels == 1 and threshold is None:
             threshold = 0.3
-<<<<<<< Updated upstream
-            warnings.warn('threshold is not defined for binary, and defaults'
-                          'to 0.3')
-=======
             warnings.warn("threshold is not defined for binary, and defaults to 0.3")
->>>>>>> Stashed changes
         self.num_classes = num_classes
         self.out_channels = out_channels
         self.threshold = threshold
@@ -98,74 +70,9 @@ class SegBaseDecodeHead(nn.Module):
         else:
             self.dropout = None
 
-    def extra_repr(self):
-        """Extra repr."""
-        s = f'input_transform={self.input_transform}, ' \
-            f'ignore_index={self.ignore_index}, ' \
-            f'align_corners={self.align_corners}'
-        return s
-
-    def _init_inputs(self, in_channels, in_index, input_transform):
-        """Check and initialize input transforms.
-
-        The in_channels, in_index and input_transform must match.
-        Specifically, when input_transform is None, only single feature map
-        will be selected. So in_channels and in_index must be of type int.
-        When input_transform
-
-        Args:
-            in_channels (int|Sequence[int]): Input channels.
-            in_index (int|Sequence[int]): Input feature index.
-            input_transform (str|None): Transformation type of input features.
-                Options: 'resize_concat', 'multiple_select', None.
-                'resize_concat': Multiple feature maps will be resize to the
-                    same size as first one and than concat together.
-                    Usually used in FCN head of HRNet.
-                'multiple_select': Multiple feature maps will be bundle into
-                    a list and passed into decode head.
-                None: Only one select feature map is allowed.
-        """
-
-        if input_transform is not None:
-            assert input_transform in ['resize_concat', 'multiple_select']
-        self.input_transform = input_transform
-        self.in_index = in_index
-        if input_transform is not None:
-            assert isinstance(in_channels, (list, tuple))
-            assert isinstance(in_index, (list, tuple))
-            assert len(in_channels) == len(in_index)
-            if input_transform == 'resize_concat':
-                self.in_channels = sum(in_channels)
-            else:
-                self.in_channels = in_channels
-        else:
-            assert isinstance(in_channels, int)
-            assert isinstance(in_index, int)
-            self.in_channels = in_channels
-
     def forward(self, inputs, img_metas):
         """Placeholder of forward function."""
         pass
-<<<<<<< Updated upstream
-      
-    def forward_train(self, img, inputs, img_metas, seg_gt):
-      """Forward function for training.
-      Args:
-          inputs (list[Tensor]): List of multi-level img features.
-          img_metas (list[dict]): List of image info dict where each dict
-              has: 'img_shape', 'scale_factor', 'flip', and may also contain
-              'filename', 'ori_shape', 'pad_shape', and 'img_norm_cfg'.
-              For details on the values of these keys see
-              `depth/datasets/pipelines/formatting.py:Collect`.
-          depth_gt (Tensor): GT depth
-
-      Returns:
-          dict[str, Tensor]: a dictionary of loss components
-      """
-      seg_pred = self.forward(inputs, img_metas)
-      losses = self.loss_by_feat(seg_pred, seg_gt)
-      return losses
-=======
 
     def forward_train(self, img, inputs, img_metas, img_gt, **kwargs):
         """Forward function for training.
@@ -184,7 +91,6 @@ class SegBaseDecodeHead(nn.Module):
         seg_pred = self.forward(inputs, img_metas)
         losses = self.loss_by_feat(seg_pred, img_gt)
         return losses
->>>>>>> Stashed changes
 
     def cls_seg(self, feat):
         """Classify each pixel."""
@@ -212,7 +118,7 @@ class SegBaseDecodeHead(nn.Module):
 
         return self.predict_by_feat(seg_logits, batch_img_metas)
 
-    def loss_by_feat(self, seg_logits, seg_gt):
+    def loss_by_feat(self, seg_logits, img_gt):
         """Compute segmentation loss.
 
         Args:
@@ -224,49 +130,24 @@ class SegBaseDecodeHead(nn.Module):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        seg_label = seg_gt
         loss = dict()
         seg_logits = resize(
-<<<<<<< Updated upstream
-          input=seg_logits, size=seg_label.shape[1:], mode='bilinear', align_corners=self.align_corners, warning=False
-=======
             input=seg_logits,
             size=img_gt.shape[1:],
             mode="bilinear",
             align_corners=self.align_corners,
             warning=False,
->>>>>>> Stashed changes
         )
         loss.update({"pred": seg_logits})
 
         seg_weight = None
-        seg_label = seg_label.squeeze(1)
+        img_gt = img_gt.squeeze(1)
 
         if not isinstance(self.loss_decode, nn.ModuleList):
             losses_decode = [self.loss_decode]
         else:
             losses_decode = self.loss_decode
         for loss_decode in losses_decode:
-<<<<<<< Updated upstream
-          if loss_decode.loss_name not in loss:
-            loss[loss_decode.loss_name] = loss_decode(
-              seg_logits,
-              seg_label,
-              weight=seg_weight,
-              ignore_index=self.ignore_index
-            )
-          else:
-            loss[loss_decode.loss_name] += loss_decode(
-              seg_logits,
-              seg_label,
-              weight=seg_weight,
-              ignore_index=self.ignore_index
-            )
-
-        # loss['acc_seg'] = accuracy(
-        #   seg_logits, seg_label, ignore_index=self.ignore_index
-        # )
-=======
             if loss_decode.loss_name not in loss:
                 loss[loss_decode.loss_name] = loss_decode(
                     seg_logits,
@@ -282,7 +163,6 @@ class SegBaseDecodeHead(nn.Module):
                     ignore_index=self.ignore_index,
                 )
 
->>>>>>> Stashed changes
         return loss
 
     def predict_by_feat(self, seg_logits, batch_img_metas):
@@ -317,9 +197,6 @@ class SegBaseDecodeHead(nn.Module):
 class BNHead(SegBaseDecodeHead):
     """Just a batchnorm."""
 
-<<<<<<< Updated upstream
-    def __init__(self, resize_factors=None, use_cls_token=True, **kwargs):
-=======
     def __init__(
         self,
         input_transform="resize_concat",
@@ -328,20 +205,16 @@ class BNHead(SegBaseDecodeHead):
         use_cls_token=True,
         **kwargs,
     ):
->>>>>>> Stashed changes
         super().__init__(**kwargs)
+        self.input_transform = input_transform
+        self.in_index = in_index
         self.use_cls_token = use_cls_token
-<<<<<<< Updated upstream
-        _channels = self.in_channels * 2 if self.use_cls_token else self.in_channels
-=======
         _channels = (
             sum(self.in_channels) * 2 if self.use_cls_token else sum(self.in_channels)
         )
->>>>>>> Stashed changes
         assert _channels == self.channels
         self.bn = nn.SyncBatchNorm(_channels)
         self.resize_factors = resize_factors
-        
 
     def _forward_feature(self, inputs, img_metas=None, **kwargs):
         """Forward function for feature maps before classifying each pixel with
@@ -426,12 +299,6 @@ class BNHead(SegBaseDecodeHead):
         return inputs
 
     def forward(self, inputs, img_metas=None, **kwargs):
-<<<<<<< Updated upstream
-      """Forward function."""
-      output = self._forward_feature(inputs, img_metas=img_metas, **kwargs)
-      output = self.cls_seg(output)
-      return output
-=======
         """Forward function."""
         output = self._forward_feature(inputs, img_metas=img_metas, **kwargs)
         output = self.cls_seg(output)
@@ -522,4 +389,3 @@ class DPTHead(SegBaseDecodeHead):
         out = self.project(out)
         out = self.cls_seg(out)
         return out
->>>>>>> Stashed changes

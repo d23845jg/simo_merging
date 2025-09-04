@@ -17,6 +17,7 @@ def _make_dinov2_linear_depth_bins_head(
     layers: int,
     min_depth: float,
     max_depth: float,
+    loss_name="loss_depth",
     **kwargs,
 ):
     if layers not in (1, 4):
@@ -42,12 +43,6 @@ def _make_dinov2_linear_depth_bins_head(
         align_corners=False,
         min_depth=min_depth,
         max_depth=max_depth,
-<<<<<<< Updated upstream
-        loss_decode=nn.ModuleList([
-            SigLoss(valid_mask=True, loss_weight=1.0, warm_up=True, loss_name="loss_depth"),
-            GradientLoss(valid_mask=True, loss_weight=0.5, loss_name="loss_grad"),
-        ])
-=======
         loss_decode=nn.ModuleList(
             [
                 SigLoss(
@@ -58,7 +53,6 @@ def _make_dinov2_linear_depth_bins_head(
         ),
         ignore_index=0,
         **kwargs,
->>>>>>> Stashed changes
     )
 
 
@@ -69,6 +63,7 @@ def _make_dinov2_linear_depth_head(
     layers: int,
     min_depth: float,
     max_depth: float,
+    loss_name="loss_depth",
     **kwargs,
 ):
     if layers not in (1, 4):
@@ -90,16 +85,6 @@ def _make_dinov2_linear_depth_head(
         align_corners=False,
         min_depth=min_depth,
         max_depth=max_depth,
-<<<<<<< Updated upstream
-        loss_decode=nn.ModuleList([
-            # SigLoss(valid_mask=True, loss_weight=1.0, warm_up=True, loss_name="loss_depth"),
-            # GradientLoss(valid_mask=True, loss_weight=0.5, loss_name="loss_grad"),
-            L1Loss(),
-        ])
-    )
-
-def _make_dinov2_dpt_depth_head(*, embed_dim: int, patch_size: int, layers: int, min_depth: float, max_depth: float):
-=======
         loss_decode=nn.ModuleList(
             [
                 # SigLoss(valid_mask=True, loss_weight=1.0, warm_up=True, loss_name="loss_depth"),
@@ -123,7 +108,6 @@ def _make_dinov2_dpt_depth_head(
     loss_name="loss_depth",
     **kwargs,
 ):
->>>>>>> Stashed changes
     if layers not in (1, 4):
         raise AssertionError(f"Unsupported number of layers: {layers}")
 
@@ -142,14 +126,6 @@ def _make_dinov2_dpt_depth_head(
         readout_type="project",
         min_depth=min_depth,
         max_depth=max_depth,
-<<<<<<< Updated upstream
-        loss_decode=nn.ModuleList([
-            # SigLoss(valid_mask=True, loss_weight=1.0, warm_up=True, loss_name="loss_depth"),
-            # GradientLoss(valid_mask=True, loss_weight=0.5, loss_name="loss_grad"),
-            L1Loss(),
-        ])
-    )
-=======
         loss_decode=nn.ModuleList(
             [
                 # SigLoss(valid_mask=True, loss_weight=1.0, warm_up=True, loss_name="loss_depth"),
@@ -238,4 +214,3 @@ def _make_dinov2_dpt_add_small_depth_head(
         ignore_index=0,
         **kwargs,
     )
->>>>>>> Stashed changes

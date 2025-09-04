@@ -6,10 +6,6 @@
 import torch
 import torch.nn as nn
 
-<<<<<<< Updated upstream
-from .decode_heads import BNHead
-=======
->>>>>>> Stashed changes
 from ...losses import CrossEntropyLoss
 from .decode_heads import BNHead, DPTHead
 
@@ -20,11 +16,8 @@ def _make_dinov2_linear_seg_head(
     cls_token: bool,
     layers: int,
     num_classes: int,
-<<<<<<< Updated upstream
-=======
     loss_name="loss_seg",
     ignore_index=-1,
->>>>>>> Stashed changes
     **kwargs,
 ):
     if layers not in (1, 4):
@@ -45,17 +38,6 @@ def _make_dinov2_linear_seg_head(
         dropout_ratio=0,
         num_classes=num_classes,
         align_corners=False,
-<<<<<<< Updated upstream
-        loss_decode=nn.ModuleList([
-            CrossEntropyLoss(
-              use_sigmoid=False, 
-              loss_weight=1.0,
-              loss_name="loss_seg",
-            ),
-        ]),
-        ignore_index=-1,
-    )
-=======
         loss_decode=nn.ModuleList(
             [
                 CrossEntropyLoss(
@@ -196,4 +178,3 @@ def _make_dinov2_dpt_add_small_seg_head(
         ),
         ignore_index=ignore_index,
     )
->>>>>>> Stashed changes
