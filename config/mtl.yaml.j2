@@ -1,7 +1,12 @@
 wandb:
   project: "simomm"
+<<<<<<< Updated upstream
   mode: "online"
   
+=======
+  mode: "online" # online, offline
+
+>>>>>>> Stashed changes
 dataset_paths:
   nyuv2: "/mnt/lts4/scratch/data/nyuv2"
   cityscapes: "/mnt/lts4/scratch/data/cityscapes"
@@ -27,12 +32,23 @@ model_merging:
   method: "sum"
   pt_model_file: "checkpoints/mtl_model.pt"
   ft_model_files:
+<<<<<<< Updated upstream
     - "checkpoints/dinov2/linear_probing/seg_model.pt"
     - "checkpoints/dinov2/linear_probing/depth_model.pt"
   dataset: "nyuv2" # nyuv2, cityscapes
   network: "split" # split, mtan
   
   num_scaling_coef_samples: 5
+=======
+    - "checkpoints/nyuv2/dinov2/linear_head/task_specific/h_hb/final/seg_model.pt"
+    - "checkpoints/nyuv2/dinov2/linear_head/task_specific/h_hb/final/depth_model.pt"
+    - "checkpoints/nyuv2/dinov2/linear_head/task_specific/h_hb/final/normal_model.pt"
+  dataset: "nyuv2" # nyuv2, cityscapes, taskonomy
+  network: "dinov2" # dinov2
+  out_dir: "tall_mask/dinov2/h_hb"
+
+  num_scaling_coef_samples: 11
+>>>>>>> Stashed changes
   specify_lambda: None
 
 

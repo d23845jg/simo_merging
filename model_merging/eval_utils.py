@@ -1,11 +1,17 @@
 import copy
-import numpy as np
 import time
+from typing import Any, Dict, Optional, Union
+
+import numpy as np
 import torch
 import wandb
 
+<<<<<<< Updated upstream
 from typing import Union, Dict, Any, Optional
 
+=======
+from model_merging.tallmask_utils import find_optimal_mask
+>>>>>>> Stashed changes
 from model_merging.task_vectors import MTLTaskVector
 from training.utils import TaskMetric, eval
 from utils import get_data_loaders
@@ -14,6 +20,7 @@ _Checkpoint = Union[str, torch.nn.Module]
 
 
 def add_normalized_accuracy(metrics: Dict[str, Any], config: Dict[str, Any]):
+<<<<<<< Updated upstream
     mtl = {
         'nyuv2': {'seg': 0.4337, 'depth': 0.5224, 'normal': 22.40},
         'cityscapes': {'seg': 0.5620, 'part_seg': 0.5274, 'disp': 0.84}
@@ -33,19 +40,112 @@ def add_normalized_accuracy(metrics: Dict[str, Any], config: Dict[str, Any]):
     metrics['all'][0] = delta_mtl / len(mtl)
     return metrics
 
+=======
+    ts_metrics = (
+        {
+            "linear": {
+                "h_hb": {
+                    "nyuv2": {"seg": 0.6823, "depth": 0.2708, "normal": 24.73},
+                },
+            },
+            "dpt-add_small": {
+                "h_hb": {
+                    "cityscapes": {"seg": 0.5758, "part_seg": 0.5055, "disp": 0.0090},
+                    "taskonomy": {
+                        "segment_semantic": 0.5139,
+                        "depth_zbuffer": 0.0146,
+                        "normal": 18.4414,
+                        "keypoints2d": 0.0062,
+                        "edge_texture": 0.0126,
+                    },
+                },
+            },
+        }
+        .get("dpt-add_small", {})
+        .get("h_hb", {})
+        .get(config["model_merging"]["dataset"], {})
+    )
+
+    if "all" not in metrics:
+        # then its because we have a mask
+        # extract mask's task performance to calculate all
+        delta_mtl = 0
+        for task in metrics:
+            if (
+                task in ["seg", "part_seg", "segment_semantic"] or "class" in task
+            ):  # higher better
+                delta_mtl += (
+                    metrics[task]["metric"][0] - ts_metrics[task]
+                ) / ts_metrics[task]
+            elif task in [
+                "depth",
+                "normal",
+                "disp",
+                "depth_zbuffer",
+                "keypoints2d",
+                "edge_texture",
+            ]:
+                delta_mtl -= (
+                    metrics[task]["metric"][0] - ts_metrics[task]
+                ) / ts_metrics[task]
+        metrics["all"] = np.array([delta_mtl / len(ts_metrics)])
+
+    for task, value in metrics.items():
+        if task in ts_metrics:
+            if task in ["seg", "part_seg", "segment_semantic"] or "class" in task:
+                metrics[task]["norm_metric"] = (
+                    metrics[task]["metric"] / ts_metrics[task]
+                )
+            elif task in [
+                "depth",
+                "normal",
+                "disp",
+                "depth_zbuffer",
+                "keypoints2d",
+                "edge_texture",
+            ]:
+                metrics[task]["norm_metric"] = (
+                    ts_metrics[task] / metrics[task]["metric"]
+                )
+    return metrics
+
+
+def evaluate(
+    model,
+    scaling_coef,
+    config: Dict[str, Any],
+    use_val_dataset: bool = False,
+):
+    _, val_loader, test_loader = get_data_loaders(config, model_merging=True)
+    data_loader = val_loader if use_val_dataset else test_loader
+    test_metric = TaskMetric(
+        model.head_tasks,
+        model.head_tasks,
+        config["training_params"]["batch_size"],
+        1,
+        config["model_merging"]["dataset"],
+        include_mtl=True,
+    )
+    eval(
+        int(10 * scaling_coef), model, data_loader, test_metric
+    )  # 10 * scaling_coef is a hack to log on wandb, as it uses the epoch
+    return test_metric.metric
+>>>>>>> Stashed changes
+
 
 def evaluate_task_vector_at_coef(
     pt_checkpoint: _Checkpoint,
     task_vector: MTLTaskVector,
     config: Dict[str, Any],
     scaling_coef: float,
-    use_val_dataset:bool=False,
+    use_val_dataset: bool = False,
     eval_masks=None,
 ):
     start_time = time.time()
 
     if eval_masks != None:
         assert config["model_merging"]["method"] in ["tall_mask", "mag_masking"]
+<<<<<<< Updated upstream
     else:
         model = task_vector.apply_to(pt_checkpoint, scaling_coef=scaling_coef)
         model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
@@ -64,6 +164,32 @@ def evaluate_task_vector_at_coef(
     test_metric = TaskMetric(model.head_tasks, model.head_tasks, config["training_params"]["batch_size"], 1, config["model_merging"]["dataset"], include_mtl=True)
     eval(int(10 * scaling_coef), model, data_loader, test_metric) # 10 * scaling_coef is a hack to change it to an int
     coef_metrics = test_metric.metric
+=======
+
+        coef_metrics = {}
+        for task in task_vector.head_tasks:
+            sparse_task_vector = copy.deepcopy(task_vector)
+            mask = eval_masks[task]
+            sparse_task_vector.theta = {
+                k: sparse_task_vector.theta[k] * mask[k].bool().cpu()
+                for k in mask.keys()
+            }
+
+            model = sparse_task_vector.apply_to(
+                pt_checkpoint, scaling_coef=1.0
+            )  # reconstruct theta_t^
+            model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+
+            coef_metrics[task] = evaluate(
+                model, scaling_coef, config, use_val_dataset=use_val_dataset
+            )[task]
+    else:
+        model = task_vector.apply_to(pt_checkpoint, scaling_coef=scaling_coef)
+        model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        coef_metrics = evaluate(
+            model, scaling_coef, config, use_val_dataset=use_val_dataset
+        )
+>>>>>>> Stashed changes
 
     coef_metrics = add_normalized_accuracy(coef_metrics, config)
     print(f"Total evaluation time: {time.time() - start_time:.2f}s")
@@ -75,8 +201,8 @@ def evaluate_task_vector(
     pt_checkpoint: _Checkpoint,
     task_vector: MTLTaskVector,
     config: Dict[str, Any],
-    use_val_dataset: bool=False,
-    eval_masks=None
+    use_val_dataset: bool = False,
+    eval_masks=None,
 ):
     info = {}
 
@@ -89,13 +215,20 @@ def evaluate_task_vector(
     elif config["model_merging"]["specify_lambda"] != "None":
         scaling_coef_range = [config["model_merging"]["specify_lambda"]]
     else:
-        scaling_coef_range = np.linspace(0.0, 1.0, config["model_merging"]["num_scaling_coef_samples"])
+        scaling_coef_range = np.linspace(
+            0.0, 1.0, config["model_merging"]["num_scaling_coef_samples"]
+        )
 
     if config["model_merging"]["method"] == "tall_mask":
         if config["tall_mask"]["load_mask"]:
             print("=" * 43, f"Evaluating the loaded TALL masks", "=" * 43)
             info["loaded_mask"] = evaluate_task_vector_at_coef(
-                pt_checkpoint, task_vector, config, 1.0, use_val_dataset, eval_masks,
+                pt_checkpoint,
+                task_vector,
+                config,
+                1.0,
+                use_val_dataset,
+                eval_masks,
             )
             print(f"Delta MTL: {round(info['loaded_mask']['all'][0], 2)}")
         else:
@@ -103,7 +236,12 @@ def evaluate_task_vector(
                 print("\n" * 2)
                 print("=" * 43, f"tall_mask_lambda = {tall_mask_lambda:.2f}", "=" * 43)
                 info[tall_mask_lambda] = evaluate_task_vector_at_coef(
-                    pt_checkpoint, task_vector, config, 1.0, use_val_dataset, eval_masks[tall_mask_lambda],
+                    pt_checkpoint,
+                    task_vector,
+                    config,
+                    1.0,
+                    use_val_dataset,
+                    eval_masks[tall_mask_lambda],
                 )
                 print(f"Delta MTL: {round(info[tall_mask_lambda]['all'][0], 2)}")
     else:
@@ -111,9 +249,25 @@ def evaluate_task_vector(
             print("\n" * 2)
             print("=" * 43, f"alpha = {scaling_coef:.2f}", "=" * 43)
             info[scaling_coef] = evaluate_task_vector_at_coef(
-                pt_checkpoint, task_vector, config, scaling_coef, use_val_dataset, eval_masks
+                pt_checkpoint,
+                task_vector,
+                config,
+                scaling_coef,
+                use_val_dataset,
+                eval_masks,
             )
+            print(
+                " | ".join(
+                    [
+                        f"{task} metric: {round(info[scaling_coef][task]['metric'][0], 4)}"
+                        for task in task_vector.head_tasks.keys()
+                    ]
+                )
+            )
+<<<<<<< Updated upstream
             print(" | ".join([f"{task} metric: {round(info[scaling_coef][task][1], 4)}" for task in task_vector.head_tasks.keys()]))
+=======
+>>>>>>> Stashed changes
             print(f"Delta MTL: {round(info[scaling_coef]['all'][0], 2)}")
 
     return info
@@ -140,12 +294,15 @@ def find_optimal_coef(
     Returns:
         The optimal coefficient based on the given results and metric.
     """
-    best_metric = float('inf') if minimize else float('-inf')
+    best_metric = float("inf") if minimize else float("-inf")
     best_coef = None
 
     for scaling_coef, metrics in results.items():
         # Check the control metric condition if applicable
-        if control_metric and metrics.get(control_metric, float('inf')) < control_metric_threshold:
+        if (
+            control_metric
+            and metrics.get(control_metric, float("inf")) < control_metric_threshold
+        ):
             continue
 
         current_metric = metrics.get(metric_name)[metric_index]
@@ -153,7 +310,9 @@ def find_optimal_coef(
             continue  # Skip if the metric isn't found in the results
 
         # Update best_coef based on the metric comparison
-        if (minimize and current_metric < best_metric) or (not minimize and current_metric > best_metric):
+        if (minimize and current_metric < best_metric) or (
+            not minimize and current_metric > best_metric
+        ):
             best_metric = current_metric
             best_coef = scaling_coef
     return best_coef
@@ -162,7 +321,7 @@ def find_optimal_coef(
 def perform_eval_with_merged_vector(
     pt_checkpoint: _Checkpoint,
     task_vector: MTLTaskVector,
-    config: Dict[str, Any], 
+    config: Dict[str, Any],
     eval_masks=None,
 ):
     assert task_vector is not None, "Task vector should not be None."
@@ -170,23 +329,43 @@ def perform_eval_with_merged_vector(
         assert config["model_merging"]["method"] in ["tall_mask", "mag_masking"]
 
     # evaluate on validation set
+<<<<<<< Updated upstream
     # val_metrics = evaluate_task_vector(pt_checkpoint, task_vector, config, use_val_dataset=True, eval_masks=eval_masks)
     # TODO: remove this
     val_metrics = evaluate_task_vector(pt_checkpoint, task_vector, config, use_val_dataset=False, eval_masks=eval_masks)
     
+=======
+    val_metrics = evaluate_task_vector(
+        pt_checkpoint, task_vector, config, use_val_dataset=True, eval_masks=eval_masks
+    )
+
+    print("\n" * 2)
+
+>>>>>>> Stashed changes
     if config["model_merging"]["method"] == "tall_mask":
         if config["tall_mask"]["load_mask"]:
             best_masks_for_test = eval_masks
             best_val_metrics = val_metrics
         # else:
             # find the best mask individually for each task based on validation accuracy
+<<<<<<< Updated upstream
             # best_masks_for_test, best_val_metrics = find_optimal_mask(val_metrics, eval_masks, args, save_masks=True)
     elif config["model_merging"]["method"] == "mag_masking":
         best_masks_for_test = eval_masks
         best_val_metrics = val_metrics[1.0]
+=======
+            best_masks_for_test, best_val_metrics = find_optimal_mask(
+                val_metrics, eval_masks, config, save_masks=True
+            )
+    # elif config["model_merging"]["method"] == "mag_masking":
+    #     best_masks_for_test = eval_masks
+    #     best_val_metrics = val_metrics[1.0]
+>>>>>>> Stashed changes
     else:
         # find scaling factor alpha based on validation accuracy (for Task Arithmetic, TIES, Consensus Merging)
-        optimal_coef = find_optimal_coef(val_metrics, metric_name="all", metric_index=0, minimize=False)
+        optimal_coef = find_optimal_coef(
+            val_metrics, metric_name="all", metric_index=0, minimize=False
+        )
         best_val_metrics = val_metrics[optimal_coef]
 
     print("\n" * 2)
@@ -194,18 +373,37 @@ def perform_eval_with_merged_vector(
     # Evaluate on the test set with the optimal coefficients / masks
     if config["model_merging"]["method"] in ["tall_mask", "mag_masking"]:
         test_metrics = evaluate_task_vector_at_coef(
-            pt_checkpoint, task_vector, config, 1.0, use_val_dataset=False, eval_masks=best_masks_for_test
+            pt_checkpoint,
+            task_vector,
+            config,
+            1.0,
+            use_val_dataset=False,
+            eval_masks=best_masks_for_test,
         )
     else:
         test_metrics = evaluate_task_vector_at_coef(
-            pt_checkpoint, task_vector, config, float(optimal_coef), use_val_dataset=False, eval_masks=None
+            pt_checkpoint,
+            task_vector,
+            config,
+            float(optimal_coef),
+            use_val_dataset=False,
+            eval_masks=None,
         )
+<<<<<<< Updated upstream
 
     print("=" * 100)
     for task_id, value in test_metrics.items():
         print(f"Test normalized metric for {task_id}: {value[-1]}")
     
     final_results = {"test": test_metrics, "val": val_metrics, "val_best": best_val_metrics}
+=======
+    print(test_metrics)
+    final_results = {
+        "test": test_metrics,
+        "val": val_metrics,
+        "val_best": best_val_metrics,
+    }
+>>>>>>> Stashed changes
     # log_results(final_results, args)
 
     return final_results

@@ -4,5 +4,5 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 from .backbones import *
-from .vision_transformer import *
 from .utils import *
+from .vision_transformer import *

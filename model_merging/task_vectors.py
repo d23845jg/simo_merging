@@ -1,6 +1,12 @@
+<<<<<<< Updated upstream
 import torch
 
+=======
+from copy import deepcopy
+>>>>>>> Stashed changes
 from typing import Union
+
+import torch
 
 from models.dinov2.mtl.multitasker import *
 from training.create_network import *
@@ -14,7 +20,7 @@ def symmetric_difference(A, B):
     return list(set(A) ^ set(B))
 
 
-class _TaskVector():
+class _TaskVector:
     def __init__(
         self,
         pretrained_state_dict=None,
@@ -30,11 +36,15 @@ class _TaskVector():
         if theta is not None:
             self.theta = theta
         else:
-            assert pretrained_state_dict is not None and finetuned_state_dict is not None
+            assert (
+                pretrained_state_dict is not None and finetuned_state_dict is not None
+            )
 
             # the final task vector is the difference between finetuned and pretrained vectors.
-            assert (pretrained_state_dict.keys() == finetuned_state_dict.keys()), f"State dicts have different keys: {symmetric_difference(pretrained_state_dict.keys(), finetuned_state_dict.keys())}."
-            
+            assert (
+                pretrained_state_dict.keys() == finetuned_state_dict.keys()
+            ), f"State dicts have different keys: {symmetric_difference(pretrained_state_dict.keys(), finetuned_state_dict.keys())}."
+
             self.theta = {}
             for key in pretrained_state_dict:
                 if pretrained_state_dict[key].dtype == torch.int64:
@@ -115,7 +125,9 @@ class MTLTaskVector(_TaskVector):
             super().__init__(None, None, theta)
             self.tau = tau
         else:
-            assert pretrained_checkpoint is not None and finetuned_checkpoint is not None
+            assert (
+                pretrained_checkpoint is not None and finetuned_checkpoint is not None
+            )
             with torch.no_grad():
                 pretrained_model = self._safe_load(pretrained_checkpoint)
                 finetuned_model = self._safe_load(finetuned_checkpoint)
@@ -123,7 +135,8 @@ class MTLTaskVector(_TaskVector):
 
                 # parse pretrained_checkpoint
                 pretrained_state_dict = {
-                    k: v for k, v in pretrained_model.state_dict().items()
+                    k: v
+                    for k, v in pretrained_model.state_dict().items()
                     if not any(task in k for task in pretrained_model.head_tasks)
                 }
 
@@ -156,6 +169,7 @@ class MTLTaskVector(_TaskVector):
         with torch.no_grad():
             pt_model = self._safe_load(pretrained_checkpoint)
             pt_model_state_dict = pt_model.state_dict()
+<<<<<<< Updated upstream
             # updates = {}
             
             for param_name, param_value in self.theta.items():
@@ -165,4 +179,16 @@ class MTLTaskVector(_TaskVector):
             # pt_model.load_state_dict({**pt_model.state_dict(), **updates, **self.tau})
             pt_model.load_state_dict({**pt_model.state_dict(), **self.tau}, strict=False)
         
+=======
+            new_state_dict = {}
+
+            for param_name, param_value in self.theta.items():
+                new_state_dict[param_name] = (
+                    pt_model_state_dict[param_name] + scaling_coef * param_value
+                )
+
+            pt_model.load_state_dict(new_state_dict, strict=False)
+            pt_model.load_state_dict(self.tau, strict=False)
+
+>>>>>>> Stashed changes
         return pt_model

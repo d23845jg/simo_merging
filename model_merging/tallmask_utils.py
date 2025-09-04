@@ -10,6 +10,7 @@ from .utils import state_dict_to_vector, vector_to_state_dict
 from .variables_and_paths import ALL_DATASETS
 
 
+<<<<<<< Updated upstream
 def log_wandb_mask_sparsity(final_mask: torch.Tensor):
     """
     Logs the mask sparsity for each dataset to Weights & Biases (wandb).
@@ -24,6 +25,8 @@ def log_wandb_mask_sparsity(final_mask: torch.Tensor):
         wandb.log({f"mask_sparsity_{dataset}": dataset_sparsities[i]})
 
 
+=======
+>>>>>>> Stashed changes
 def generate_task_masks(
     tv_flat_checks: torch.Tensor,
     flat_ft: torch.Tensor,
@@ -47,6 +50,7 @@ def generate_task_masks(
 
     print(f"Generating TALL masks.")
 
+<<<<<<< Updated upstream
     if tv is None:
         tv = tv_flat_checks.sum(0)
 
@@ -68,6 +72,19 @@ def generate_task_masks(
     log_wandb_mask_sparsity(final_mask)
 
     return final_mask
+=======
+    # compare the l1 distance, scaled with hyper-parameter lambda
+    mask = (
+        flat_task_vectors.abs()
+        > (mtl_task_vector - flat_task_vectors).abs() * tall_mask_lambda
+    )
+
+    print(
+        f"Average sparsity for the mask with tall_mask_lambda of {tall_mask_lambda}: {mask.float().mean():.4f}"
+    )
+    # log_wandb_mask_sparsity(mask)
+    return mask
+>>>>>>> Stashed changes
 
 
 def construct_tall_mask(
@@ -96,12 +113,28 @@ def construct_tall_mask(
     for tall_mask_lambda in [0.2, 0.3, 0.4, 0.5, 0.6]:
         # generate tall masks for each lambda
         masks_at_scale = generate_task_masks(
+<<<<<<< Updated upstream
             tv_flat_checks, flat_ft, flat_ptm, tall_mask_lambda=tall_mask_lambda, tv=merged_tv
         )
         # convert vectors to dictionary
         masks_at_scale = [vector_to_state_dict(mask, ptm_check, remove_keys=remove_keys) for mask in masks_at_scale]
         # store the masks with {dataset: mask}
         tall_masks[tall_mask_lambda] = {key: value for key, value in zip(config.DATASETS, masks_at_scale)}
+=======
+            flat_task_vectors, merged_tv, tall_mask_lambda=tall_mask_lambda
+        )
+        # convert vectors to dictionary
+        masks_at_scale = [
+            vector_to_state_dict(
+                mask, list(task_vectors.values())[0].theta, remove_keys=remove_keys
+            )
+            for mask in masks_at_scale
+        ]
+        # store the masks with {task: mask}
+        tall_masks[tall_mask_lambda] = {
+            key: value for key, value in zip(task_vectors.keys(), masks_at_scale)
+        }
+>>>>>>> Stashed changes
     return tall_masks
 
 
@@ -117,6 +150,11 @@ def find_optimal_mask(val_metrics, eval_masks, args, save_masks=True):
         best_masks_for_test: the best masks for each task, selected based on validation accuracy from each task
         best_val_metrics: best validation metrics for each task
     """
+<<<<<<< Updated upstream
+=======
+    print("=" * 39, "finding optimal lambdas for masks", "=" * 39)
+
+>>>>>>> Stashed changes
     # transpose the dict from lambda-task to task-lambda
     transposed_dict = {}
     for key, inner_dict in val_metrics.items():
@@ -126,7 +164,21 @@ def find_optimal_mask(val_metrics, eval_masks, args, save_masks=True):
             transposed_dict[inner_key][key] = value
 
     # for each task, find the best lambda
+<<<<<<< Updated upstream
     max_subkeys = {key: max(inner_dict, key=inner_dict.get) for key, inner_dict in transposed_dict.items()}
+=======
+    max_subkeys = {
+        task: (
+            max(lambdas, key=lambda k: lambdas[k].get("metric", float("-inf")))
+            if task in ["seg", "part_seg", "segment_semantic"] or "class" in task
+            else min(
+                lambdas, key=lambda k: lambdas[k].get("metric", float("inf"))
+            )  # if task in ["depth", "normal", "disp"]:
+        )
+        for task, lambdas in transposed_dict.items()
+        if any(isinstance(val, dict) and "metric" in val for val in lambdas.values())
+    }
+>>>>>>> Stashed changes
 
     # select the best mask for each task, which will be used for testing later
     best_masks_for_test = {}
@@ -154,8 +206,15 @@ def find_optimal_mask(val_metrics, eval_masks, args, save_masks=True):
             if not args.method.use_ties
             else f"TALL_mask_{args.num_tasks}task_use_ties_{args.method.ties_agg}.npy"
         )
+<<<<<<< Updated upstream
         np.save(os.path.join(mask_save_dir, args.model, mask_name), best_masks_for_test_vector)
         del best_masks_for_test_vector
+=======
+        torch.save(
+            best_masks_for_test,
+            os.path.join(config["model_merging"]["out_dir"], mask_name),
+        )
+>>>>>>> Stashed changes
 
     return best_masks_for_test, best_val_metrics
 
@@ -168,14 +227,28 @@ def load_tall_mask(remove_keys, ptm_check, config):
             print("==== Loading TALL Masks built with TIES ====")
             tall_masks = torch.load(
                 os.path.join(
+<<<<<<< Updated upstream
                     mask_location,
                     config.model,
                     f"TALL_mask_{config.num_tasks}task_use_ties.npy",
+=======
+                    config["model_merging"]["out_dir"],
+                    f"TALL_mask_ties_{config['tall_mask']['ties_agg']}_{config['model_merging']['dataset']}.npy",
+>>>>>>> Stashed changes
                 )
             )
         else:
             print("==== Loading TALL Masks built with Task Arithmetic ====")
+<<<<<<< Updated upstream
             tall_masks = torch.load(os.path.join(mask_location, config.model, f"TALL_mask_{config.num_tasks}task.npy"))
+=======
+            tall_masks = torch.load(
+                os.path.join(
+                    config["model_merging"]["out_dir"],
+                    f"TALL_mask_{config['model_merging']['dataset']}.npy",
+                )
+            )
+>>>>>>> Stashed changes
     except:
         raise Exception("TALL Masks are not constructed yet.")
 
@@ -195,8 +268,12 @@ def construct_consensus_mask(ptm_check, prun_thre_k, config, remove_keys=[]):
     Generate consensus mask by filtering out least-used parameters
 
     Args:
+<<<<<<< Updated upstream
         ptm_check: pretrained_checkpoint as state dictionary
         prun_thre_k: weight-pruning threhold, stands for the least number of activated tasks for a parameter to be preserved from pruning
+=======
+        prun_thre_k: weight-pruning threshold, stands for the least number of activated tasks for a parameter to be preserved from pruning
+>>>>>>> Stashed changes
                 if prun_thre_k is set to 2: remove both catastrophic and selfish weights;
                 if prun_thre_k is set to 1: remove only catastrophic weights;
                 if prun_thre_k is set to 0: remove no weights -> reduce to TA or TIES
@@ -219,6 +296,8 @@ def construct_consensus_mask(ptm_check, prun_thre_k, config, remove_keys=[]):
             consensus_mask[key] = consensus_mask[key] + mask[key].float()
         # filter out the least-activated parameters based on given threshold
         consensus_mask[key] = consensus_mask[key].float() >= prun_thre_k
-    consensus_mask_vector = state_dict_to_vector(consensus_mask, remove_keys=remove_keys)
+    consensus_mask_vector = state_dict_to_vector(
+        consensus_mask, remove_keys=remove_keys
+    )
 
     return consensus_mask_vector

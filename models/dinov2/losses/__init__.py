@@ -6,5 +6,5 @@
 from .accuracy import accuracy
 from .cross_entropy_loss import CrossEntropyLoss
 from .gradientloss import GradientLoss
-from .sigloss import SigLoss
 from .L1 import L1Loss
+from .sigloss import SigLoss

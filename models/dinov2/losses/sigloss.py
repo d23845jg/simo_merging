@@ -6,6 +6,7 @@
 import torch
 import torch.nn as nn
 
+
 class SigLoss(nn.Module):
     """SigLoss.
 
@@ -20,7 +21,13 @@ class SigLoss(nn.Module):
     """
 
     def __init__(
-        self, valid_mask=True, loss_weight=1.0, max_depth=None, warm_up=False, warm_iter=100, loss_name="sigloss"
+        self,
+        valid_mask=True,
+        loss_weight=1.0,
+        max_depth=None,
+        warm_up=False,
+        warm_iter=100,
+        loss_name="sigloss",
     ):
         super(SigLoss, self).__init__()
         self.valid_mask = valid_mask
@@ -37,7 +44,11 @@ class SigLoss(nn.Module):
 
     def sigloss(self, input, target):
         if self.valid_mask:
+<<<<<<< Updated upstream
             valid_mask = target > 0
+=======
+            valid_mask = target > 0  # ignore_index
+>>>>>>> Stashed changes
             if self.max_depth is not None:
                 valid_mask = torch.logical_and(target > 0, target <= self.max_depth)
             input = input[valid_mask]

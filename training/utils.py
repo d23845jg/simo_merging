@@ -1,21 +1,116 @@
+from copy import deepcopy
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 import wandb
-
-from copy import deepcopy
 from PIL import Image
 from scipy.optimize import minimize
 
+"""
+<<<<<<< Updated upstream
+=======
+Define task flags and weight strings.
+"""
+
+
+def create_task_flags(task, dataset):
+    nyu_tasks = {
+        "seg": {
+            "num_classes": 13,
+        },
+        "depth": {
+            "num_classes": 1,
+            "min_depth": 0.0,
+            "max_depth": 10.0,
+        },
+        "normal": {
+            "num_classes": 3,
+        },
+    }
+    cityscapes_tasks = {
+        "seg": {
+            "num_classes": 19,
+        },
+        "part_seg": {
+            "num_classes": 10,
+        },
+        "disp": {
+            "num_classes": 1,
+            "min_depth": 0.0,
+            "max_depth": 1.0,
+        },
+    }
+    taskonomy_tasks = {
+        "segment_semantic": {
+            "num_classes": 18,
+        },
+        "depth_zbuffer": {"num_classes": 1, "min_depth": 0.0, "max_depth": 0.0},
+        "normal": {
+            "num_classes": 3,
+        },
+        "keypoints2d": {
+            "num_classes": 1,
+        },
+        "edge_texture": {
+            "num_classes": 1,
+        },
+    }
+    dataset_tasks = {
+        "nyuv2": nyu_tasks,
+        "cityscapes": cityscapes_tasks,
+        "taskonomy": taskonomy_tasks,
+    }
+
+    tasks = dataset_tasks.get(dataset, {})
+    if task != "all":
+        tasks = {task: tasks.get(task)}
+
+    return tasks
+
+
+def get_weight_str(weight, tasks):
+    """
+    Record task weighting.
+    """
+    weight_str = "Task Weighting | "
+    for i, task_id in enumerate(tasks):
+        weight_str += "{} {:.04f} ".format(task_id.title(), weight[i])
+    return weight_str
+
+
+def get_weight_str_ranked(weight, tasks, rank_num):
+    """
+    Record top-k ranked task weighting.
+    """
+    rank_idx = np.argsort(weight)
+
+    if type(tasks) == dict:
+        tasks = list(tasks.keys())
+
+    top_str = "Top {}: ".format(rank_num)
+    bot_str = "Bottom {}: ".format(rank_num)
+    for i in range(rank_num):
+        top_str += "{} {:.02f} ".format(
+            tasks[rank_idx[-i - 1]].title(), weight[rank_idx[-i - 1]]
+        )
+        bot_str += "{} {:.02f} ".format(tasks[rank_idx[i]].title(), weight[rank_idx[i]])
+
+    return "Task Weighting | {}| {}".format(top_str, bot_str)
+
 
 """
+>>>>>>> Stashed changes
 Define task metrics, loss functions and model trainer here.
 """
+
+
 class ConfMatrix(object):
     """
     For mIoU and other pixel-level classification tasks.
     """
+
     def __init__(self, num_classes):
         self.num_classes = num_classes
         self.mat = None
@@ -30,33 +125,60 @@ class ConfMatrix(object):
         with torch.no_grad():
             k = (target >= 0) & (target < n)
             inds = n * target[k].to(torch.int64) + pred[k]
-            self.mat += torch.bincount(inds, minlength=n ** 2).reshape(n, n)
+            self.mat += torch.bincount(inds, minlength=n**2).reshape(n, n)
 
     def get_metrics(self):
         h = self.mat.float()
+<<<<<<< Updated upstream
         iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
         return torch.mean(iu).item()
-
+=======
+        intersection = torch.diag(h)
+        union = h.sum(1) + h.sum(0) - intersection
+        valid = union > 0  # Avoid division by zero
+        iu = torch.zeros_like(union)
+        iu[valid] = intersection[valid] / union[valid]
+        return torch.mean(iu[valid]).item()
+>>>>>>> Stashed changes
 
 
 """
 Define TaskMetric class to record task-specific metrics.
 """
+
+
 class TaskMetric:
-    def __init__(self, train_tasks, pri_tasks, batch_size, epochs, dataset, include_mtl=False):
+    def __init__(
+        self, train_tasks, pri_tasks, batch_size, epochs, dataset, include_mtl=False
+    ):
         self.train_tasks = train_tasks
         self.pri_tasks = pri_tasks
         self.batch_size = batch_size
         self.dataset = dataset
         self.include_mtl = include_mtl
+<<<<<<< Updated upstream
         self.metric = {key: np.zeros([epochs, 2]) for key in train_tasks.keys()}  # record loss & task-specific metric
+=======
+        self.metric = {
+            key: {"loss": np.zeros([epochs]), "metric": np.zeros([epochs])}
+            for key in train_tasks
+        }  # record loss & task-specific metric
+>>>>>>> Stashed changes
         self.data_counter = 0
         self.epoch_counter = 0
         self.conf_mtx = {}
 
+<<<<<<< Updated upstream
         if include_mtl:  # include multi-task performance (relative averaged task improvement)
             self.metric['all'] = np.zeros(epochs)
         
+=======
+        if (
+            include_mtl
+        ):  # include multi-task performance (relative averaged task improvement)
+            self.metric["all"] = np.zeros([epochs])
+
+>>>>>>> Stashed changes
         for task in self.train_tasks:
             if task in ['seg', 'part_seg']:
                 self.conf_mtx[task] = ConfMatrix(self.train_tasks[task]["num_classes"])
@@ -85,18 +207,30 @@ class TaskMetric:
         self.data_counter += 1
 
         with torch.no_grad():
+<<<<<<< Updated upstream
             for task_id, gt in task_gt.items():
                 pred = train_res[task_id]["pred"]
                 self.metric[task_id][e, 0] = r * self.metric[task_id][e, 0] + (1 - r) * train_res[task_id]["total_loss"].item()
+=======
+            for task_id, gt in img_gt.items():
+                pred = img_pred[task_id]["pred"]
+                self.metric[task_id]["loss"][e] = (
+                    r * self.metric[task_id]["loss"][e]
+                    + (1 - r) * img_pred[task_id][f"loss_{task_id}"].item()
+                )
+>>>>>>> Stashed changes
 
                 if task_id in ['seg', 'part_seg']:
                     # update confusion matrix (metric will be computed directly in the Confusion Matrix)
-                    self.conf_mtx[task_id].update(pred.argmax(1).flatten(), gt.flatten())
+                    self.conf_mtx[task_id].update(
+                        pred.argmax(1).flatten(), gt.flatten()
+                    )
 
                 if 'class' in task_id:
                     # Accuracy for image classification tasks
                     pred_label = pred.data.max(1)[1]
                     acc = pred_label.eq(gt).sum().item() / pred_label.shape[0]
+<<<<<<< Updated upstream
                     self.metric[task_id][e, 1] = r * self.metric[task_id][e, 1] + (1 - r) * acc
 
                 if task_id in ['depth', 'disp', 'noise']:
@@ -107,18 +241,61 @@ class TaskMetric:
                     self.metric[task_id][e, 1] = r * self.metric[task_id][e, 1] + (1 - r) * abs_err
 
                 if task_id in ['normal']:
+=======
+                    self.metric[task_id]["metric"][e] = (
+                        r * self.metric[task_id]["metric"][e] + (1 - r) * acc
+                    )
+
+                if task_id in [
+                    "depth",
+                    "disp",
+                    "depth_zbuffer",
+                    "keypoints2d",
+                    "edge_texture",
+                ]:
+                    # Abs. Err.
+                    ignore_idx = img_metas.get("mask", 0)  # invalid_idx=0
+                    valid_mask = (
+                        (torch.sum(gt, dim=1, keepdim=True) != ignore_idx).to(
+                            pred.device
+                        )
+                        if isinstance(ignore_idx, int)
+                        else ignore_idx
+                    )
+                    abs_err = torch.mean(
+                        torch.abs(pred - gt).masked_select(valid_mask)
+                    ).item()
+                    self.metric[task_id]["metric"][e] = (
+                        r * self.metric[task_id]["metric"][e] + (1 - r) * abs_err
+                    )
+
+                if task_id in ["normal"]:
+>>>>>>> Stashed changes
                     # Mean Degree Err.
                     valid_mask = (torch.sum(gt, dim=1) != 0).to(pred.device)
-                    degree_error = torch.acos(torch.clamp(torch.sum(pred * gt, dim=1).masked_select(valid_mask), -1, 1))
+                    degree_error = torch.acos(
+                        torch.clamp(
+                            torch.sum(pred * gt, dim=1).masked_select(valid_mask), -1, 1
+                        )
+                    )
                     mean_error = torch.mean(torch.rad2deg(degree_error)).item()
+<<<<<<< Updated upstream
                     self.metric[task_id][e, 1] = r * self.metric[task_id][e, 1] + (1 - r) * mean_error
+=======
+                    self.metric[task_id]["metric"][e] = (
+                        r * self.metric[task_id]["metric"][e] + (1 - r) * mean_error
+                    )
+>>>>>>> Stashed changes
 
     def compute_metric(self, only_pri=False):
-        metric_str = ''
+        metric_str = ""
         e = self.epoch_counter
-        tasks = self.pri_tasks if only_pri else self.train_tasks  # only print primary tasks performance in evaluation
+        tasks = (
+            self.pri_tasks if only_pri else self.train_tasks
+        )  # only print primary tasks performance in evaluation
 
         for task_id in tasks:
+<<<<<<< Updated upstream
             if task_id in ['seg', 'part_seg']:  # mIoU for segmentation
                 self.metric[task_id][e, 1] = self.conf_mtx[task_id].get_metrics()
 
@@ -141,9 +318,63 @@ class TaskMetric:
 
             self.metric['all'][e] = delta_mtl / len(stl)
             metric_str += ' | All {:.4f}'.format(self.metric['all'][e])
+=======
+            if task_id in [
+                "seg",
+                "part_seg",
+                "segment_semantic",
+            ]:  # mIoU for segmentation
+                self.metric[task_id]["metric"][e] = self.conf_mtx[task_id].get_metrics()
+
+            metric_str += " {} {:.4f} {:.4f}".format(
+                task_id.capitalize(),
+                self.metric[task_id]["loss"][e],
+                self.metric[task_id]["metric"][e],
+            )
+
+        if self.include_mtl:
+            # Pre-computed single task learning performance
+            if self.dataset == "nyuv2":
+                stl = {"seg": 0.6823, "depth": 0.2708, "normal": 24.73}
+            elif self.dataset == "cityscapes":
+                stl = {"seg": 0.5876, "part_seg": 0.5088, "disp": 0.0102}
+            elif self.dataset == "taskonomy":
+                stl = {
+                    "segment_semantic": 0.5139,
+                    "depth_zbuffer": 0.0146,
+                    "normal": 18.4414,
+                    "keypoints2d": 0.0062,
+                    "edge_texture": 0.0126,
+                }
+
+            delta_mtl = 0
+            for task_id in self.train_tasks:
+                if (
+                    task_id in ["seg", "part_seg", "segment_semantic"]
+                    or "class" in task_id
+                ):  # higher better
+                    delta_mtl += (
+                        self.metric[task_id]["metric"][e] - stl[task_id]
+                    ) / stl[task_id]
+                elif task_id in [
+                    "depth",
+                    "normal",
+                    "disp",
+                    "depth_zbuffer",
+                    "keypoints2d",
+                    "edge_texture",
+                ]:
+                    delta_mtl -= (
+                        self.metric[task_id]["metric"][e] - stl[task_id]
+                    ) / stl[task_id]
+
+            self.metric["all"][e] = delta_mtl / len(stl)
+            metric_str += " | All {:.4f}".format(self.metric["all"][e])
+>>>>>>> Stashed changes
         return metric_str
-    
+
     def get_metric(self, task):
+<<<<<<< Updated upstream
         return self.metric[task][self.epoch_counter-1, 1]
 
     def get_best_performance(self, task):
@@ -153,10 +384,34 @@ class TaskMetric:
         if task in ['depth', 'normal', 'disp']:  # lower better
             return min(self.metric[task][:e, 1])
         if task in ['all']:  # higher better
+=======
+        if task != "all":
+            return self.metric[task]["metric"][self.epoch_counter - 1]
+        else:
+            return self.metric[task][self.epoch_counter - 1]
+
+    def get_best_performance(self, task):
+        e = self.epoch_counter
+        if (
+            task in ["seg", "part_seg", "segment_semantic"] or "class" in task
+        ):  # higher better
+            return max(self.metric[task]["metric"][:e])
+        if task in [
+            "depth",
+            "normal",
+            "disp",
+            "depth_zbuffer",
+            "keypoints2d",
+            "edge_texture",
+        ]:  # lower better
+            return min(self.metric[task]["metric"][:e])
+        if task in ["all"]:  # higher better
+>>>>>>> Stashed changes
             return max(self.metric[task][:e])
 
 
 
+<<<<<<< Updated upstream
 """
 Define Gradient-based frameworks here. 
 Based on https://github.com/Cranial-XIX/CAGrad/blob/main/cityscapes/utils.py
@@ -366,9 +621,11 @@ def compute_loss(pred, gt, task_id):
                 / torch.nonzero(valid_mask, as_tuple=False).size(0)
     return loss
 
+=======
+>>>>>>> Stashed changes
 def eval(
     epoch: int,
-    model, 
+    model,
     data_loader: torch.utils.data.DataLoader,
     test_metric: TaskMetric,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -385,6 +642,7 @@ def eval(
         for batch_idx in range(data_batch):
             img, target = next(dataset)
             img = img.to(device)
+<<<<<<< Updated upstream
             target = {task_id: target[task_id].to(device) for task_id in model.head_tasks.keys()}
 
             test_res = model(img, None, img_gt=target, return_loss=True)
@@ -395,10 +653,23 @@ def eval(
                 for task_id in model.head_tasks:
                     if task_id in VISUALIZATION_FUNCS:
                         VISUALIZATION_FUNCS[task_id](epoch, img, test_res[task_id]["pred"], target[task_id])
+=======
+            img_metas = (
+                {} if "mask" not in target else {"mask": target.get("mask").to(device)}
+            )
+            target = {
+                task_id: target[task_id].to(device) for task_id in model.head_tasks
+            }
+
+            test_res = model(img, img_metas, img_gt=target, return_loss=True)
+
+            test_metric.update_metric(test_res, img_metas, target)
+>>>>>>> Stashed changes
 
     test_str = test_metric.compute_metric()
     test_metric.reset()
 
+<<<<<<< Updated upstream
     wandb.log({
         **{f"{mode}/test/loss/{task_id}": test_res[task_id]["total_loss"] for task_id in model.head_tasks},
         **{f"{mode}/test/metric/{task_id}": test_metric.get_metric(task_id) for task_id in model.head_tasks}
@@ -471,3 +742,24 @@ def get_weight_str_ranked(weight, tasks, rank_num):
         bot_str += '{} {:.02f} '.format(tasks[rank_idx[i]].title(), weight[rank_idx[i]])
 
     return 'Task Weighting | {}| {}'.format(top_str, bot_str)
+=======
+    wandb.log(
+        {
+            **{
+                f"{mode}/test/loss/{task_id}": test_res[task_id][f"loss_{task_id}"]
+                for task_id in model.head_tasks
+            },
+            **{
+                f"{mode}/test/metric/{task_id}": test_metric.get_metric(task_id)
+                for task_id in model.head_tasks
+            },
+            **(
+                {f"{mode}/test/metric/all": test_metric.get_metric("all")}
+                if task == "all"
+                else {}
+            ),
+        },
+    )  # step=epoch
+
+    return test_str
+>>>>>>> Stashed changes

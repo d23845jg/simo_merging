@@ -8,6 +8,7 @@ import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from .utils import get_class_weight, weight_reduce_loss
 
 
@@ -46,7 +47,9 @@ def cross_entropy(
 
     # class_weight is a manual rescaling weight given to each class.
     # If given, has to be a Tensor of size C element-wise losses
-    loss = F.cross_entropy(pred, label, weight=class_weight, reduction="none", ignore_index=ignore_index)
+    loss = F.cross_entropy(
+        pred, label, weight=class_weight, reduction="none", ignore_index=ignore_index
+    )
 
     # apply weights and do the reduction
     # average loss over non-ignored elements
@@ -56,7 +59,9 @@ def cross_entropy(
         avg_factor = label.numel() - (label == ignore_index).sum().item()
     if weight is not None:
         weight = weight.float()
-    loss = weight_reduce_loss(loss, weight=weight, reduction=reduction, avg_factor=avg_factor)
+    loss = weight_reduce_loss(
+        loss, weight=weight, reduction=reduction, avg_factor=avg_factor
+    )
 
     return loss
 
@@ -118,15 +123,22 @@ def binary_cross_entropy(
     if pred.size(1) == 1:
         # For binary class segmentation, the shape of pred is
         # [N, 1, H, W] and that of label is [N, H, W].
-        assert label.max() <= 1, "For pred with shape [N, 1, H, W], its label must have at " "most 2 classes"
+        assert label.max() <= 1, (
+            "For pred with shape [N, 1, H, W], its label must have at " "most 2 classes"
+        )
         pred = pred.squeeze()
     if pred.dim() != label.dim():
-        assert (pred.dim() == 2 and label.dim() == 1) or (pred.dim() == 4 and label.dim() == 3), (
-            "Only pred shape [N, C], label shape [N] or pred shape [N, C, " "H, W], label shape [N, H, W] are supported"
+        assert (pred.dim() == 2 and label.dim() == 1) or (
+            pred.dim() == 4 and label.dim() == 3
+        ), (
+            "Only pred shape [N, C], label shape [N] or pred shape [N, C, "
+            "H, W], label shape [N, H, W] are supported"
         )
         # `weight` returned from `_expand_onehot_labels`
         # has been treated for valid (non-ignore) pixels
-        label, weight, valid_mask = _expand_onehot_labels(label, weight, pred.shape, ignore_index)
+        label, weight, valid_mask = _expand_onehot_labels(
+            label, weight, pred.shape, ignore_index
+        )
     else:
         # should mask out the ignored elements
         valid_mask = ((label >= 0) & (label != ignore_index)).float()
@@ -138,7 +150,9 @@ def binary_cross_entropy(
     if reduction == "mean" and avg_factor is None and avg_non_ignore:
         avg_factor = valid_mask.sum().item()
 
-    loss = F.binary_cross_entropy_with_logits(pred, label.float(), pos_weight=class_weight, reduction="none")
+    loss = F.binary_cross_entropy_with_logits(
+        pred, label.float(), pos_weight=class_weight, reduction="none"
+    )
     # do the reduction for the weighted loss
     loss = weight_reduce_loss(loss, weight, reduction=reduction, avg_factor=avg_factor)
 
@@ -146,7 +160,14 @@ def binary_cross_entropy(
 
 
 def mask_cross_entropy(
-    pred, target, label, reduction="mean", avg_factor=None, class_weight=None, ignore_index=None, **kwargs
+    pred,
+    target,
+    label,
+    reduction="mean",
+    avg_factor=None,
+    class_weight=None,
+    ignore_index=None,
+    **kwargs,
 ):
     """Calculate the CrossEntropy loss for masks.
 
@@ -174,7 +195,9 @@ def mask_cross_entropy(
     num_rois = pred.size()[0]
     inds = torch.arange(0, num_rois, dtype=torch.long, device=pred.device)
     pred_slice = pred[inds, label].squeeze(1)
-    return F.binary_cross_entropy_with_logits(pred_slice, target, weight=class_weight, reduction="mean")[None]
+    return F.binary_cross_entropy_with_logits(
+        pred_slice, target, weight=class_weight, reduction="mean"
+    )[None]
 
 
 class CrossEntropyLoss(nn.Module):
@@ -238,7 +261,14 @@ class CrossEntropyLoss(nn.Module):
         return s
 
     def forward(
-        self, cls_score, label, weight=None, avg_factor=None, reduction_override=None, ignore_index=-100, **kwargs
+        self,
+        cls_score,
+        label,
+        weight=None,
+        avg_factor=None,
+        reduction_override=None,
+        ignore_index=-100,
+        **kwargs,
     ):
         """Forward function."""
         assert reduction_override in (None, "none", "mean", "sum")

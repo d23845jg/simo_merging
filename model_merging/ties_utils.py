@@ -25,7 +25,9 @@ def disjoint_merge(tensor, merge_func, sign_to_mult):
 
     # If sign is provided then we select the corresponding entries and aggregate.
     if sign_to_mult is not None:
-        rows_to_keep = torch.where(sign_to_mult.unsqueeze(0) > 0, tensor > 0, tensor < 0)
+        rows_to_keep = torch.where(
+            sign_to_mult.unsqueeze(0) > 0, tensor > 0, tensor < 0
+        )
         selected_entries = tensor * rows_to_keep
     # Else we select all non-zero entries and aggregate.
     else:
@@ -34,7 +36,9 @@ def disjoint_merge(tensor, merge_func, sign_to_mult):
 
     if merge_func == "mean":
         non_zero_counts = (selected_entries != 0).sum(dim=0).float()
-        disjoint_aggs = torch.sum(selected_entries, dim=0) / torch.clamp(non_zero_counts, min=1)
+        disjoint_aggs = torch.sum(selected_entries, dim=0) / torch.clamp(
+            non_zero_counts, min=1
+        )
     elif merge_func == "sum":
         disjoint_aggs = torch.sum(selected_entries, dim=0)
     elif merge_func == "max":

@@ -4,11 +4,11 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import copy
-from functools import partial
 import math
-import numpy as np
 import warnings
+from functools import partial
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -92,12 +92,18 @@ class DepthBaseDecodeHead(nn.Module):
 
         if self.classify:
             assert bins_strategy in ["UD", "SID"], "Support bins_strategy: UD, SID"
-            assert norm_strategy in ["linear", "softmax", "sigmoid"], "Support norm_strategy: linear, softmax, sigmoid"
+            assert norm_strategy in [
+                "linear",
+                "softmax",
+                "sigmoid",
+            ], "Support norm_strategy: linear, softmax, sigmoid"
 
             self.bins_strategy = bins_strategy
             self.norm_strategy = norm_strategy
             self.softmax = nn.Softmax(dim=1)
-            self.conv_depth = nn.Conv2d(channels, n_bins, kernel_size=3, padding=1, stride=1)
+            self.conv_depth = nn.Conv2d(
+                channels, n_bins, kernel_size=3, padding=1, stride=1
+            )
         else:
             self.conv_depth = nn.Conv2d(channels, 1, kernel_size=3, padding=1, stride=1)
 
@@ -149,9 +155,13 @@ class DepthBaseDecodeHead(nn.Module):
             logit = self.conv_depth(feat)
 
             if self.bins_strategy == "UD":
-                bins = torch.linspace(self.min_depth, self.max_depth, self.n_bins, device=feat.device)
+                bins = torch.linspace(
+                    self.min_depth, self.max_depth, self.n_bins, device=feat.device
+                )
             elif self.bins_strategy == "SID":
-                bins = torch.logspace(self.min_depth, self.max_depth, self.n_bins, device=feat.device)
+                bins = torch.logspace(
+                    self.min_depth, self.max_depth, self.n_bins, device=feat.device
+                )
 
             # following Adabins, default linear
             if self.norm_strategy == "linear":
@@ -177,20 +187,46 @@ class DepthBaseDecodeHead(nn.Module):
     def losses(self, depth_pred, depth_gt):
         """Compute depth loss."""
         loss = dict()
+<<<<<<< Updated upstream
         depth_pred = resize(
             input=depth_pred, size=depth_gt.shape[2:], mode="bilinear", align_corners=self.align_corners, warning=False
         )
         loss.update({"pred": depth_pred})
         
+=======
+        img_logits = resize(
+            input=img_logits,
+            size=img_gt.shape[2:],
+            mode="bilinear",
+            align_corners=self.align_corners,
+            warning=False,
+        )
+        loss.update({"pred": img_logits})
+
+>>>>>>> Stashed changes
         if not isinstance(self.loss_decode, nn.ModuleList):
             losses_decode = [self.loss_decode]
         else:
             losses_decode = self.loss_decode
+<<<<<<< Updated upstream
         for loss_decode in losses_decode:
             if loss_decode.loss_name not in loss:
                 loss[loss_decode.loss_name] = loss_decode(depth_pred, depth_gt)
             else:
                 loss[loss_decode.loss_name] += loss_decode(depth_pred, depth_gt)
+=======
+
+        ignore_idx = img_metas.get("mask", self.ignore_index)
+        for loss_decode in losses_decode:
+            if loss_decode.loss_name not in loss:
+                loss[loss_decode.loss_name] = loss_decode(
+                    img_logits, img_gt, ignore_index=ignore_idx
+                )
+            else:
+                loss[loss_decode.loss_name] += loss_decode(
+                    img_logits, img_gt, ignore_index=ignore_idx
+                )
+>>>>>>> Stashed changes
         return loss
 
     def log_images(self, img_path, depth_pred, depth_gt, img_meta):
@@ -214,13 +250,28 @@ class DepthBaseDecodeHead(nn.Module):
         depth_pred_color = copy.deepcopy(depth_pred.detach().cpu())
         depth_gt_color = copy.deepcopy(depth_gt.detach().cpu())
 
+<<<<<<< Updated upstream
         return {"img_rgb": show_img, "img_depth_pred": depth_pred_color, "img_depth_gt": depth_gt_color}
+=======
+        return {
+            "img_rgb": show_img,
+            "img_depth_pred": depth_pred_color,
+            "img_img_gt": img_gt_color,
+        }
+>>>>>>> Stashed changes
 
 
 class BNHead(DepthBaseDecodeHead):
     """Just a batchnorm."""
 
-    def __init__(self, input_transform="resize_concat", in_index=(0, 1, 2, 3), upsample=1, use_cls_token=True, **kwargs):
+    def __init__(
+        self,
+        input_transform="resize_concat",
+        in_index=(0, 1, 2, 3),
+        upsample=1,
+        use_cls_token=True,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.input_transform = input_transform
         self.use_cls_token = use_cls_token
@@ -228,9 +279,13 @@ class BNHead(DepthBaseDecodeHead):
         self.upsample = upsample
         # self.bn = nn.SyncBatchNorm(self.in_channels)
         if self.classify:
-            self.conv_depth = nn.Conv2d(self.channels, self.n_bins, kernel_size=1, padding=0, stride=1)
+            self.conv_depth = nn.Conv2d(
+                self.channels, self.n_bins, kernel_size=1, padding=0, stride=1
+            )
         else:
-            self.conv_depth = nn.Conv2d(self.channels, 1, kernel_size=1, padding=0, stride=1)
+            self.conv_depth = nn.Conv2d(
+                self.channels, 1, kernel_size=1, padding=0, stride=1
+            )
 
     def _transform_inputs(self, inputs):
         """Transform inputs for decoder.
@@ -711,30 +766,50 @@ class DPTHead(DepthBaseDecodeHead):
 
         self.in_channels = self.in_channels
         self.expand_channels = expand_channels
-        
-        self.reassemble_blocks = ReassembleBlocks(embed_dims, post_process_channels, readout_type, patch_size)
+
+        self.reassemble_blocks = ReassembleBlocks(
+            embed_dims, post_process_channels, readout_type, patch_size
+        )
 
         self.post_process_channels = [
-            channel * math.pow(2, i) if expand_channels else channel for i, channel in enumerate(post_process_channels)
+            channel * math.pow(2, i) if expand_channels else channel
+            for i, channel in enumerate(post_process_channels)
         ]
-        
+
         self.convs = nn.ModuleList()
         for channel in self.post_process_channels:
-            self.convs.append(ConvModule(channel, self.channels, kernel_size=3, padding=1, act_layer=None, bias=False))
-        
+            self.convs.append(
+                ConvModule(
+                    channel,
+                    self.channels,
+                    kernel_size=3,
+                    padding=1,
+                    act_layer=None,
+                    bias=False,
+                )
+            )
+
         self.fusion_blocks = nn.ModuleList()
         for _ in range(len(self.convs)):
-            self.fusion_blocks.append(FeatureFusionBlock(self.channels, self.act_layer, self.norm_layer))
+            self.fusion_blocks.append(
+                FeatureFusionBlock(self.channels, self.act_layer, self.norm_layer)
+            )
         self.fusion_blocks[0].res_conv_unit1 = None
-        
-        self.project = ConvModule(self.channels, self.channels, kernel_size=3, padding=1, norm_layer=self.norm_layer)
-        
+
+        self.project = ConvModule(
+            self.channels,
+            self.channels,
+            kernel_size=3,
+            padding=1,
+            norm_layer=self.norm_layer,
+        )
+
         self.num_fusion_blocks = len(self.fusion_blocks)
         self.num_reassemble_blocks = len(self.reassemble_blocks.resize_layers)
         self.num_post_process_channels = len(self.post_process_channels)
         assert self.num_fusion_blocks == self.num_reassemble_blocks
         assert self.num_reassemble_blocks == self.num_post_process_channels
-        
+
         self.conv_depth = HeadDepth(self.channels)
 
     def forward(self, inputs, img_metas):

@@ -1,6 +1,14 @@
 import copy
+<<<<<<< Updated upstream
 import torch
 from collections import OrderedDict
+=======
+from collections import OrderedDict
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+>>>>>>> Stashed changes
 
 
 def state_dict_to_vector(state_dict, remove_keys=[]):
@@ -10,7 +18,9 @@ def state_dict_to_vector(state_dict, remove_keys=[]):
             del shared_state_dict[key]
 
     sorted_shared_state_dict = OrderedDict(sorted(shared_state_dict.items()))
-    return torch.nn.utils.parameters_to_vector([value.reshape(-1) for key, value in sorted_shared_state_dict.items()])
+    return torch.nn.utils.parameters_to_vector(
+        [value.reshape(-1) for key, value in sorted_shared_state_dict.items()]
+    )
 
 
 def vector_to_state_dict(vector, state_dict, remove_keys=[]):
@@ -21,13 +31,15 @@ def vector_to_state_dict(vector, state_dict, remove_keys=[]):
             del reference_dict[key]
     sorted_reference_dict = OrderedDict(sorted(reference_dict.items()))
 
-    # create a shared state dict using the refence dict
+    # create a shared state dict using the reference dict
     torch.nn.utils.vector_to_parameters(vector, sorted_reference_dict.values())
 
     # add back the encoder and decoder embedding weights.
     if "transformer.shared.weight" in sorted_reference_dict:
         for key in remove_keys:
-            sorted_reference_dict[key] = sorted_reference_dict["transformer.shared.weight"]
+            sorted_reference_dict[key] = sorted_reference_dict[
+                "transformer.shared.weight"
+            ]
     return sorted_reference_dict
 
 
@@ -71,4 +83,27 @@ def topk_values_mask(M, K=0.7, return_mask=False, reshape_mask=False):
     if return_mask:
         return M * final_mask, final_mask.float().mean(dim=1), final_mask
     else:
+<<<<<<< Updated upstream
         return M * final_mask, final_mask.float().mean(dim=1)
+=======
+        return M * final_mask, final_mask.float().mean(dim=1)
+
+
+def compute_cosine_similarity_matrix(task_vectors):
+    flat_task_vectors = torch.vstack(
+        [state_dict_to_vector(task_vectors[task].theta, []) for task in task_vectors]
+    )
+
+    n_tasks = len(flat_task_vectors)
+    cosine_sim_matrix = np.zeros((n_tasks, n_tasks))
+
+    for i in range(n_tasks):
+        for j in range(i, n_tasks):
+            cos_sim = F.cosine_similarity(
+                flat_task_vectors[i], flat_task_vectors[j], dim=0
+            ).item()
+            cosine_sim_matrix[i, j] = cos_sim
+            cosine_sim_matrix[j, i] = cos_sim
+
+    return cosine_sim_matrix
+>>>>>>> Stashed changes
